@@ -2,7 +2,18 @@ import subprocess
 import csv
 import time
 from datetime import datetime
-from config import TARGET, LOG_FILE, ROLLING_WINDOW_SIZE, THRESHOLD_MULTIPLIER, MAX_ENTRIES
+from config import (
+    TARGET,
+    LOG_FILE,
+    ROLLING_WINDOW_SIZE,
+    THRESHOLD_MULTIPLIER,
+    MAX_ENTRIES,
+    EMOJI_NORMAL,
+    EMOJI_MILD_SPIKE,
+    EMOJI_MODERATE_SPIKE,
+    EMOJI_SEVERE_SPIKE,
+    EMOJI_TIMEOUT,
+)
 
 # List to store all response times
 response_times = []
@@ -28,17 +39,18 @@ def calculate_rolling_average_and_std(times_list):
         return avg, std_dev
     return None, None
 
-def is_spike(response_time, average, std_dev, threshold=2):
-    if response_time is not None and average is not None and std_dev is not None:
-        return response_time > average + (threshold * std_dev)
-    return False
-
-def calculate_spike_visual(response_time, average, std_dev, threshold=2):
+def calculate_network_status(response_time, average, std_dev, threshold=2):
     if response_time is not None and average is not None and std_dev is not None:
         spike_value = (response_time - (average + threshold * std_dev)) / std_dev
-        if spike_value > 0:
-            return '!' * int(spike_value)
-    return ''
+        if spike_value > 3:
+            return EMOJI_SEVERE_SPIKE
+        elif spike_value > 2:
+            return EMOJI_MODERATE_SPIKE
+        elif spike_value > 1:
+            return EMOJI_MILD_SPIKE
+        elif spike_value > 0:
+            return EMOJI_NORMAL
+    return EMOJI_NORMAL
 
 def calculate_average_of_last_n_entries(times_list, n):
     if len(times_list) == 0:
@@ -76,19 +88,17 @@ def main():
                 # Calculate rolling average and standard deviation for spike detection
                 avg, std_dev = calculate_rolling_average_and_std(response_times[-ROLLING_WINDOW_SIZE:])
                 
-                # Check for spikes and calculate visual representation
-                spike_detected = is_spike(response_time, avg, std_dev, THRESHOLD_MULTIPLIER)
-                spike_visual = calculate_spike_visual(response_time, avg, std_dev, THRESHOLD_MULTIPLIER)
+                # Determine network status
+                network_status = calculate_network_status(response_time, avg, std_dev, THRESHOLD_MULTIPLIER)
                 
                 # Log the timestamp, response time, and averages to the CSV file
-                writer.writerow([timestamp, response_time, one_min_avg, five_min_avg, ten_min_avg, spike_detected])
+                writer.writerow([timestamp, response_time, one_min_avg, five_min_avg, ten_min_avg, network_status])
                 
                 # Print the log to the console
                 if response_time is not None:
-                    spike_msg = f"Spike detected {spike_visual}" if spike_detected else "No spike"
-                    print(f"{timestamp}: {response_time} ms | 1m Avg: {one_min_avg:.2f} ms | 5m Avg: {five_min_avg:.2f} ms | 10m Avg: {ten_min_avg:.2f} ms | {spike_msg}")
+                    print(f"{network_status} {timestamp}: {response_time} ms | 1m Avg: {one_min_avg:.2f} ms | 5m Avg: {five_min_avg:.2f} ms | 10m Avg: {ten_min_avg:.2f} ms")
                 else:
-                    print(f"{timestamp}: Request timed out | 1m Avg: {one_min_avg:.2f} ms | 5m Avg: {five_min_avg:.2f} ms | 10m Avg: {ten_min_avg:.2f} ms")
+                    print(f"{EMOJI_TIMEOUT} {timestamp}: Request timed out | 1m Avg: {one_min_avg:.2f} ms | 5m Avg: {five_min_avg:.2f} ms | 10m Avg: {ten_min_avg:.2f} ms")
                 
                 # Wait for a second before the next ping
                 time.sleep(1)
