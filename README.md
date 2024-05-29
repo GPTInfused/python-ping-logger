@@ -1,11 +1,12 @@
 # Python Ping Logger
 
+<img src="./python-ping-logger-demo.gif" alt="Demo" width="500">
+
 ## tl;dr
 
-- It logs the pings to a target.
+- It logs the pings to a target into a `csv` file.
 - It prints out the 1m / 5m / 10m averages.
-- It detects spikes and shows you how big the spike is visually.
-  - One exclamtion mark is one standard deviation from the 1m avg.
+- It also detects spikes and shows you how big the spike is visually (mild: ⚠️, moderate: ❗, severe: 🚨).
 
 ## Why I created this?
 
@@ -25,8 +26,8 @@ https://chatgpt.com/share/cf266469-0913-4ffd-a2ba-bfd12c784ec3
 
 Ensure you have Python installed.
 
-1. Clone the repository `git clone`
-2. Configure: Edit the config.py file to set your target host and other configurations
+1. Clone the repository `git clone https://github.com/GPTInfused/python-ping-logger.git`
+2. Configure: Edit the `config.py` file to set your target host and other configurations
 3. Run the Script: `python3 ping_logger.py`
 
 ## Configuration
@@ -49,5 +50,5 @@ Ensure you have Python installed.
 Feel free to submit issues or pull requests. Contributions are welcome!
 License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
 
