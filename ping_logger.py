@@ -2,13 +2,7 @@ import subprocess
 import csv
 import time
 from datetime import datetime
-
-# Constants
-TARGET = "192.168.50.11"
-LOG_FILE = "ping_log.csv"
-ROLLING_WINDOW_SIZE = 60
-THRESHOLD_MULTIPLIER = 2
-MAX_ENTRIES = 600  # Maximum number of entries to keep; sufficient for 10-minute averages
+from config import TARGET, LOG_FILE, ROLLING_WINDOW_SIZE, THRESHOLD_MULTIPLIER, MAX_ENTRIES
 
 # List to store all response times
 response_times = []
