@@ -9,7 +9,7 @@ MAX_ENTRIES = 600  # Maximum number of entries to keep; sufficient for 10-minute
 # Emoji configurations for visual representation of ping status
 
 EMOJI_NORMAL = "✅"
-EMOJI_MILD_SPIKE = "⚠️"
+EMOJI_MILD_SPIKE = "⚠️ "
 EMOJI_MODERATE_SPIKE = "❗"
 EMOJI_SEVERE_SPIKE = "🚨"
 EMOJI_TIMEOUT = "❌"
