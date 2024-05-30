@@ -34,7 +34,11 @@ def load_last_12_hours(log_file):
                 if not timestamp_str or not response_time_str:
                     continue
 
-                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                try:
+                    timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    continue
+
                 if timestamp < twelve_hours_ago:
                     break
 
