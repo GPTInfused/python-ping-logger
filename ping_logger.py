@@ -3,6 +3,7 @@ import csv
 import time
 from datetime import datetime, timedelta
 import platform
+import logging
 from config import (
     TARGET,
     LOG_FILE,
@@ -16,12 +17,16 @@ from config import (
     EMOJI_TIMEOUT,
 )
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 # List to store all response times
 response_times = []
 
 def load_last_12_hours(log_file):
     try:
         with open(log_file, mode='r') as file:
+            logging.info(f"Loading data from {log_file}")
             reader = list(csv.DictReader(file))
             now = datetime.now()
             twelve_hours_ago = now - timedelta(hours=12)
@@ -36,7 +41,8 @@ def load_last_12_hours(log_file):
 
                 try:
                     timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                except ValueError:
+                except ValueError as e:
+                    logging.error(f"Error parsing timestamp '{timestamp_str}': {e}")
                     continue
 
                 if timestamp < twelve_hours_ago:
@@ -45,12 +51,14 @@ def load_last_12_hours(log_file):
                 try:
                     response_time = float(response_time_str)
                     temp_times.append(response_time)
-                except ValueError:
+                except ValueError as e:
+                    logging.error(f"Error parsing response time '{response_time_str}': {e}")
                     continue
             
             response_times.extend(reversed(temp_times))
+            logging.info(f"Loaded {len(temp_times)} entries from the last 12 hours")
     except FileNotFoundError:
-        pass
+        logging.warning(f"Log file {log_file} not found, starting with an empty list")
 
 def ping_host(host):
     param = '-n' if platform.system().lower() == 'windows' else '-c'
@@ -92,8 +100,8 @@ def calculate_network_status(response_time, average, std_dev, threshold=2):
     return EMOJI_NORMAL
 
 def calculate_average_of_last_n_entries(times_list, n):
-    if len(times_list) >= n:
-        return sum(times_list[-n:]) / n
+    if len(times_list) > 0:
+        return sum(times_list[-min(len(times_list), n):]) / min(len(times_list), n)
     return None
 
 def main():
@@ -147,13 +155,13 @@ def main():
                 writer.writerow([timestamp, response_time, one_min_avg, five_min_avg, ten_min_avg, one_hour_avg, three_hour_avg, five_hour_avg, twelve_hour_avg, network_status])
                 
                 if response_time is not None:
-                    print(f"{network_status} {timestamp}: {response_time:8.3f} ms{avg_info}")
+                    logging.info(f"{network_status} {timestamp}: {response_time:8.3f} ms{avg_info}")
                 else:
-                    print(f"{EMOJI_TIMEOUT} {timestamp}: Request timed out{avg_info}")
+                    logging.info(f"{EMOJI_TIMEOUT} {timestamp}: Request timed out{avg_info}")
                 
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("Ping operation stopped.")
+            logging.info("Ping operation stopped.")
 
 if __name__ == "__main__":
     main()
