@@ -15,6 +15,7 @@ from config import (
     EMOJI_MODERATE_SPIKE,
     EMOJI_SEVERE_SPIKE,
     EMOJI_TIMEOUT,
+    PERIODS
 )
 
 # Configure logging
@@ -57,8 +58,14 @@ def load_last_12_hours(log_file):
             
             response_times.extend(reversed(temp_times))
             logging.info(f"Loaded {len(temp_times)} entries from the last 12 hours")
+            calculate_data_availability(len(temp_times))
     except FileNotFoundError:
         logging.warning(f"Log file {log_file} not found, starting with an empty list")
+
+def calculate_data_availability(entries):
+    for period, label in PERIODS:
+        percentage = (entries / period) * 100 if entries <= period else 100
+        logging.info(f"Data availability for {label}: {percentage:.2f}%")
 
 def ping_host(host):
     param = '-n' if platform.system().lower() == 'windows' else '-c'
@@ -110,7 +117,8 @@ def main():
     
     with open(LOG_FILE, mode='a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Timestamp", "Response Time (ms)", "1m Avg (ms)", "5m Avg (ms)", "10m Avg (ms)", "1h Avg (ms)", "3h Avg (ms)", "5h Avg (ms)", "12h Avg (ms)", "Status"])
+        headers = ["Timestamp", "Response Time (ms)"] + [label for _, label in PERIODS] + ["Status"]
+        writer.writerow(headers)
 
         try:
             while True:
@@ -123,36 +131,18 @@ def main():
                     if len(response_times) > MAX_ENTRIES:
                         response_times.pop(0)
                 
-                one_min_avg = calculate_average_of_last_n_entries(response_times, 60)
-                five_min_avg = calculate_average_of_last_n_entries(response_times, 300)
-                ten_min_avg = calculate_average_of_last_n_entries(response_times, 600)
-                one_hour_avg = calculate_average_of_last_n_entries(response_times, 3600)
-                three_hour_avg = calculate_average_of_last_n_entries(response_times, 10800)
-                five_hour_avg = calculate_average_of_last_n_entries(response_times, 18000)
-                twelve_hour_avg = calculate_average_of_last_n_entries(response_times, 43200)
-                
+                averages = [calculate_average_of_last_n_entries(response_times, period) for period, _ in PERIODS]
                 avg, std_dev = calculate_rolling_average_and_std(response_times[-ROLLING_WINDOW_SIZE:])
                 
                 network_status = calculate_network_status(response_time, avg, std_dev, THRESHOLD_MULTIPLIER)
                 
                 # Prepare the printout message
                 avg_info = ""
-                if one_min_avg is not None:
-                    avg_info += f" | 1m Avg: {one_min_avg:8.2f} ms"
-                if five_min_avg is not None:
-                    avg_info += f" | 5m Avg: {five_min_avg:8.2f} ms"
-                if ten_min_avg is not None:
-                    avg_info += f" | 10m Avg: {ten_min_avg:8.2f} ms"
-                if one_hour_avg is not None:
-                    avg_info += f" | 1h Avg: {one_hour_avg:8.2f} ms"
-                if three_hour_avg is not None:
-                    avg_info += f" | 3h Avg: {three_hour_avg:8.2f} ms"
-                if five_hour_avg is not None:
-                    avg_info += f" | 5h Avg: {five_hour_avg:8.2f} ms"
-                if twelve_hour_avg is not None:
-                    avg_info += f" | 12h Avg: {twelve_hour_avg:8.2f} ms"
+                for average, (_, label) in zip(averages, PERIODS):
+                    if average is not None:
+                        avg_info += f" | {label}: {average:8.2f} ms"
                 
-                writer.writerow([timestamp, response_time, one_min_avg, five_min_avg, ten_min_avg, one_hour_avg, three_hour_avg, five_hour_avg, twelve_hour_avg, network_status])
+                writer.writerow([timestamp, response_time] + averages + [network_status])
                 
                 if response_time is not None:
                     logging.info(f"{network_status} {timestamp}: {response_time:8.3f} ms{avg_info}")

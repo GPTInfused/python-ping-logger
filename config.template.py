@@ -13,3 +13,15 @@ EMOJI_MILD_SPIKE = "⚠️ "
 EMOJI_MODERATE_SPIKE = "❗"
 EMOJI_SEVERE_SPIKE = "🚨"
 EMOJI_TIMEOUT = "❌"
+
+# Periods for calculating averages (in seconds) and their text representations
+
+PERIODS = [
+    (60, "1m Avg"),
+    (300, "5m Avg"),
+    (600, "10m Avg"),
+    (3600, "1h Avg"),
+    (10800, "3h Avg"),
+    (18000, "5h Avg"),
+    (43200, "12h Avg")
+]
