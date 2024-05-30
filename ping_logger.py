@@ -94,7 +94,9 @@ def calculate_rolling_average_and_std(times_list):
     return None, None
 
 def calculate_network_status(response_time, average, std_dev, threshold=2):
-    if response_time is not None and average is not None and std_dev is not None:
+    if response_time is None:
+        return EMOJI_TIMEOUT
+    if average is not None and std_dev is not None:
         spike_value = (response_time - (average + threshold * std_dev)) / std_dev
         if spike_value > 3:
             return EMOJI_SEVERE_SPIKE
@@ -127,7 +129,6 @@ def main():
                 
                 if response_time is not None:
                     response_times.append(response_time)
-                    
                     if len(response_times) > MAX_ENTRIES:
                         response_times.pop(0)
                 
@@ -135,19 +136,20 @@ def main():
                 avg, std_dev = calculate_rolling_average_and_std(response_times[-ROLLING_WINDOW_SIZE:])
                 
                 network_status = calculate_network_status(response_time, avg, std_dev, THRESHOLD_MULTIPLIER)
-                
+
                 # Prepare the printout message
                 avg_info = ""
                 for average, (_, label) in zip(averages, PERIODS):
                     if average is not None:
                         avg_info += f" | {label}: {average:8.2f} ms"
+
+                if response_time is not None:
+                    log_message = f"{network_status} {timestamp}: {response_time:8.3f} ms{avg_info}"
+                else:
+                    log_message = f"{network_status} {timestamp}: Timed out{avg_info}"
                 
                 writer.writerow([timestamp, response_time] + averages + [network_status])
-                
-                if response_time is not None:
-                    logging.info(f"{network_status} {timestamp}: {response_time:8.3f} ms{avg_info}")
-                else:
-                    logging.info(f"{EMOJI_TIMEOUT} {timestamp}: Request timed out{avg_info}")
+                logging.info(log_message)
                 
                 time.sleep(1)
         except KeyboardInterrupt:
