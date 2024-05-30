@@ -1,7 +1,8 @@
 import subprocess
 import csv
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+import platform
 from config import (
     TARGET,
     LOG_FILE,
@@ -18,17 +19,51 @@ from config import (
 # List to store all response times
 response_times = []
 
+def load_last_12_hours(log_file):
+    try:
+        with open(log_file, mode='r') as file:
+            reader = list(csv.DictReader(file))
+            now = datetime.now()
+            twelve_hours_ago = now - timedelta(hours=12)
+            temp_times = []
+
+            for row in reversed(reader):
+                timestamp_str = row.get('Timestamp', '')
+                response_time_str = row.get('Response Time (ms)', '')
+
+                if not timestamp_str or not response_time_str:
+                    continue
+
+                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                if timestamp < twelve_hours_ago:
+                    break
+
+                try:
+                    response_time = float(response_time_str)
+                    temp_times.append(response_time)
+                except ValueError:
+                    continue
+            
+            response_times.extend(reversed(temp_times))
+    except FileNotFoundError:
+        pass
+
 def ping_host(host):
-    # Use the system's ping command to ping the host
-    process = subprocess.Popen(["ping", "-c", "1", host], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    param = '-n' if platform.system().lower() == 'windows' else '-c'
+    command = ['ping', param, '1', host]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     
     if process.returncode == 0:
-        # Parse the output to get the response time
         for line in stdout.splitlines():
-            if b"time=" in line:
-                time_ms = float(line.split(b"time=")[1].split()[0])
-                return time_ms
+            if platform.system().lower() == 'windows':
+                if b'Time=' in line:
+                    time_ms = float(line.split(b'Time=')[1].split()[0].replace(b'ms', b''))
+                    return time_ms
+            else:
+                if b'time=' in line:
+                    time_ms = float(line.split(b'time=')[1].split()[0])
+                    return time_ms
     return None
 
 def calculate_rolling_average_and_std(times_list):
@@ -58,49 +93,43 @@ def calculate_average_of_last_n_entries(times_list, n):
     return sum(times_list[-n:]) / min(len(times_list), n)
 
 def main():
-    # Open the CSV file in write mode and create a CSV writer
-    with open(LOG_FILE, mode='w', newline='') as file:
+    # Load the last 12 hours of data
+    load_last_12_hours(LOG_FILE)
+    
+    with open(LOG_FILE, mode='a', newline='') as file:
         writer = csv.writer(file)
-        # Write the header row
-        writer.writerow(["Timestamp", "Response Time (ms)", "1m Avg (ms)", "5m Avg (ms)", "10m Avg (ms)", "Spike"])
+        writer.writerow(["Timestamp", "Response Time (ms)", "1m Avg (ms)", "5m Avg (ms)", "10m Avg (ms)", "1h Avg (ms)", "3h Avg (ms)", "5h Avg (ms)", "12h Avg (ms)", "Status"])
 
-        # Continuous ping loop
         try:
             while True:
-                # Get the current timestamp
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                # Ping the target host
                 response_time = ping_host(TARGET)
                 
-                # Update the list of response times
                 if response_time is not None:
                     response_times.append(response_time)
                     
-                    # Keep only the last MAX_ENTRIES entries for calculating averages
                     if len(response_times) > MAX_ENTRIES:
                         response_times.pop(0)
                 
-                # Calculate averages
                 one_min_avg = calculate_average_of_last_n_entries(response_times, 60)
                 five_min_avg = calculate_average_of_last_n_entries(response_times, 300)
                 ten_min_avg = calculate_average_of_last_n_entries(response_times, 600)
+                one_hour_avg = calculate_average_of_last_n_entries(response_times, 3600)
+                three_hour_avg = calculate_average_of_last_n_entries(response_times, 10800)
+                five_hour_avg = calculate_average_of_last_n_entries(response_times, 18000)
+                twelve_hour_avg = calculate_average_of_last_n_entries(response_times, 43200)
                 
-                # Calculate rolling average and standard deviation for spike detection
                 avg, std_dev = calculate_rolling_average_and_std(response_times[-ROLLING_WINDOW_SIZE:])
                 
-                # Determine network status
                 network_status = calculate_network_status(response_time, avg, std_dev, THRESHOLD_MULTIPLIER)
                 
-                # Log the timestamp, response time, and averages to the CSV file
-                writer.writerow([timestamp, response_time, one_min_avg, five_min_avg, ten_min_avg, network_status])
+                writer.writerow([timestamp, response_time, one_min_avg, five_min_avg, ten_min_avg, one_hour_avg, three_hour_avg, five_hour_avg, twelve_hour_avg, network_status])
                 
-                # Print the log to the console
                 if response_time is not None:
-                    print(f"{network_status} {timestamp}: {response_time} ms | 1m Avg: {one_min_avg:.2f} ms | 5m Avg: {five_min_avg:.2f} ms | 10m Avg: {ten_min_avg:.2f} ms")
+                    print(f"{network_status} {timestamp}: {response_time:8.3f} ms | 1m Avg: {one_min_avg:8.2f} ms | 5m Avg: {five_min_avg:8.2f} ms | 10m Avg: {ten_min_avg:8.2f} ms | 1h Avg: {one_hour_avg:8.2f} ms | 3h Avg: {three_hour_avg:8.2f} ms | 5h Avg: {five_hour_avg:8.2f} ms | 12h Avg: {twelve_hour_avg:8.2f} ms")
                 else:
-                    print(f"{EMOJI_TIMEOUT} {timestamp}: Request timed out | 1m Avg: {one_min_avg:.2f} ms | 5m Avg: {five_min_avg:.2f} ms | 10m Avg: {ten_min_avg:.2f} ms")
+                    print(f"{EMOJI_TIMEOUT} {timestamp}: Request timed out | 1m Avg: {one_min_avg:8.2f} ms | 5m Avg: {five_min_avg:8.2f} ms | 10m Avg: {ten_min_avg:8.2f} ms | 1h Avg: {one_hour_avg:8.2f} ms | 3h Avg: {three_hour_avg:8.2f} ms | 5h Avg: {five_hour_avg:8.2f} ms | 12h Avg: {twelve_hour_avg:8.2f} ms")
                 
-                # Wait for a second before the next ping
                 time.sleep(1)
         except KeyboardInterrupt:
             print("Ping operation stopped.")
