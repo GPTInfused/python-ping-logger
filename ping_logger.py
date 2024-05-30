@@ -88,9 +88,9 @@ def calculate_network_status(response_time, average, std_dev, threshold=2):
     return EMOJI_NORMAL
 
 def calculate_average_of_last_n_entries(times_list, n):
-    if len(times_list) == 0:
-        return None
-    return sum(times_list[-n:]) / min(len(times_list), n)
+    if len(times_list) >= n:
+        return sum(times_list[-n:]) / n
+    return None
 
 def main():
     # Load the last 12 hours of data
@@ -123,12 +123,29 @@ def main():
                 
                 network_status = calculate_network_status(response_time, avg, std_dev, THRESHOLD_MULTIPLIER)
                 
+                # Prepare the printout message
+                avg_info = ""
+                if one_min_avg is not None:
+                    avg_info += f" | 1m Avg: {one_min_avg:8.2f} ms"
+                if five_min_avg is not None:
+                    avg_info += f" | 5m Avg: {five_min_avg:8.2f} ms"
+                if ten_min_avg is not None:
+                    avg_info += f" | 10m Avg: {ten_min_avg:8.2f} ms"
+                if one_hour_avg is not None:
+                    avg_info += f" | 1h Avg: {one_hour_avg:8.2f} ms"
+                if three_hour_avg is not None:
+                    avg_info += f" | 3h Avg: {three_hour_avg:8.2f} ms"
+                if five_hour_avg is not None:
+                    avg_info += f" | 5h Avg: {five_hour_avg:8.2f} ms"
+                if twelve_hour_avg is not None:
+                    avg_info += f" | 12h Avg: {twelve_hour_avg:8.2f} ms"
+                
                 writer.writerow([timestamp, response_time, one_min_avg, five_min_avg, ten_min_avg, one_hour_avg, three_hour_avg, five_hour_avg, twelve_hour_avg, network_status])
                 
                 if response_time is not None:
-                    print(f"{network_status} {timestamp}: {response_time:8.3f} ms | 1m Avg: {one_min_avg:8.2f} ms | 5m Avg: {five_min_avg:8.2f} ms | 10m Avg: {ten_min_avg:8.2f} ms | 1h Avg: {one_hour_avg:8.2f} ms | 3h Avg: {three_hour_avg:8.2f} ms | 5h Avg: {five_hour_avg:8.2f} ms | 12h Avg: {twelve_hour_avg:8.2f} ms")
+                    print(f"{network_status} {timestamp}: {response_time:8.3f} ms{avg_info}")
                 else:
-                    print(f"{EMOJI_TIMEOUT} {timestamp}: Request timed out | 1m Avg: {one_min_avg:8.2f} ms | 5m Avg: {five_min_avg:8.2f} ms | 10m Avg: {ten_min_avg:8.2f} ms | 1h Avg: {one_hour_avg:8.2f} ms | 3h Avg: {three_hour_avg:8.2f} ms | 5h Avg: {five_hour_avg:8.2f} ms | 12h Avg: {twelve_hour_avg:8.2f} ms")
+                    print(f"{EMOJI_TIMEOUT} {timestamp}: Request timed out{avg_info}")
                 
                 time.sleep(1)
         except KeyboardInterrupt:
